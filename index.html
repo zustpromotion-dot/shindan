@@ -151,6 +151,7 @@ td.you, th.you { background: var(--accent-soft); font-weight: 700; }
 .field { display: grid; gap: 4px; font-size: 13.5px; }
 .field select { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; }
 #otherDate { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; margin-top: 8px; }
+.qsub a { color: var(--accent); font-weight: 700; }
 .collect { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; font-size: 14.5px; }
 .collect li { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); }
 .collect .mark { flex: none; width: 18px; height: 18px; margin-top: 2px; border: 1.5px solid var(--line); border-radius: 50%; display: grid; place-items: center; font-size: 11px; }
@@ -201,14 +202,15 @@ const QUESTIONS = [
   { id: "strength", q: "貴院の一番の強みは？", opts: [["access","通いやすさ（待ち時間・立地）"],["expert","専門性・専門医"],["care","丁寧な説明・話しやすさ"],["equip","設備・新しい治療"],["hours","夜間・土日の診療"]] },
   { id: "focus", q: "今後、力を入れたい診療は？", opts: [["general","一般診療（保険）"],["self","自費診療"],["special","専門外来"],["prevent","予防・健診"]] },
   { id: "route", q: "新しい患者さんは、どこから知って来院することが多いですか？", opts: [["map","Googleマップ"],["hp","ホームページ"],["ref","紹介・口コミ"],["walk","通りがかり"],["unknown","わからない"]] },
+  { id: "gmap", q: "貴院のGoogleマップの口コミは、何件くらいありますか？", sub: "だいたいで構いません", mapLink: true, opts: [["lt30","30件未満"],["lt100","30〜100件"],["lt300","100〜300件"],["ge300","300件以上"]] },
   { id: "reason", q: "患者さんが貴院を選ぶ決め手は、何だと思いますか？", opts: [["near","近さ"],["review","口コミ・評判"],["expert","専門性"],["hours","診療時間"]] },
   { id: "foreign", q: "外国人の患者さんについて、方針は？", opts: [["yes","積極的に受け入れたい"],["some","対応できる範囲で"],["no","今は考えていない"]] },
   { id: "web", q: "Web上の情報発信について、院としての考えは？", opts: [["active","積極的にやりたい"],["min","必要な分だけ"],["busy","やりたいが手が回らない"]] },
   { id: "theme", type: "text", q: "地域で「〇〇といえば、うち」と言われたいことは？", sub: "症状や診療内容を、ひとことでご入力ください" }
 ];
-// 8問目の入力例（診療科ごと。リストの診療科で出し分ける）
+// 最後の質問（入力式）の入力例（診療科ごと。リストの診療科で出し分ける）
 const THEME_EXAMPLES = { 皮膚科: "ニキビ治療、子どもの皮膚トラブル", 歯科: "インプラント、小児歯科", 内科: "糖尿病、胃カメラ", 眼科: "白内障手術、ドライアイ", 整形外科: "スポーツのけが、腰痛" };
-// 8問目の入力からタイプ判定に足す点数（キーワードで判定）
+// 最後の質問の入力からタイプ判定に足す点数（キーワードで判定）
 const THEME_KEYWORDS = [[/美容|自費|自由診療|インプラント|矯正|ホワイトニング|審美|シミ|たるみ|脱毛|レーシック/, { jihi: 1 }], [/子ども|こども|小児|キッズ/, { kakari: 1 }], [/英語|外国|インバウンド/, { inbound: 1 }]];
 const themeText = () => (state.answers.theme || "").trim() || `${CLINIC.dept}の診療全般`;
 
@@ -258,6 +260,12 @@ const yn = (v, y = "あり", n = "なし") => v ? y : n;
 // 判定基準（AI検索・訪日外国人は evaluate 内のコメント参照）
 // Googleマップ：近隣の医院のうち、貴院より口コミが多い医院の割合で決める（25%未満A／50%未満B／75%未満C／それ以上D）。
 //   評価が近隣の中央値より0.5以上低ければ1段階下げる。
+const GMAP_BANDS = {
+  ge300: { grade: "A", label: "300件以上", note: "口コミが多く、地域でもよく見られている水準です。" },
+  lt300: { grade: "B", label: "100〜300件", note: "口コミは一定数あり、上位の医院に近づける水準です。" },
+  lt100: { grade: "C", label: "30〜100件", note: "口コミが少なめで、比べられると埋もれやすい水準です。" },
+  lt30: { grade: "D", label: "30件未満", note: "口コミがまだ少なく、Googleマップで選ばれにくい水準です。" }
+};
 // データが取れなかった項目は grade を null にし、判定・優先順位から外す（推測で埋めない）
 const NO_DATA = { grade: null, note: "", facts: [] };
 function evaluate(c, d) {
@@ -274,7 +282,12 @@ function evaluate(c, d) {
       ["口コミの件数", `${c.reviews}件`, `近隣${n}院で${more + 1}番目（中央値 ${Math.round(medN)}件）`],
       ["口コミの評価", c.rating != null ? c.rating.toFixed(1) : "—", medR != null ? `近隣の中央値 ${medR.toFixed(1)}` : ""]] };
   } else {
-    out.meo = { ...NO_DATA, note: "Googleマップの口コミ件数を確認できなかったため、今回は判定していません。" };
+    // 口コミ件数のデータがない医院は、ご回答の件数の区切りで判定する
+    // （実データでは近隣の中央値が約60〜120件、上位4分の1が約180〜300件以上だったため、これを目安に区切る）
+    const band = GMAP_BANDS[state.answers.gmap];
+    out.meo = band
+      ? { grade: band.grade, note: band.note, facts: [["口コミの件数（ご回答）", band.label, "地域の上位の医院は、100〜300件以上が目安"]] }
+      : { ...NO_DATA, note: "口コミの件数を確認できなかったため、今回は判定していません。" };
   }
   // AI検索・訪日外国人：AIに実際に聞くのは無料ではできないため、ホームページの中身からパターンで判定する
   //   AI検索　　：解説ページ10以上＋よくある質問＋医師紹介でA／解説3以上＋（質問か医師紹介）でB／解説1以上か質問ありでC／それ以外D
@@ -368,10 +381,10 @@ function renderIntro() {
   <section class="sheet fade">
     <p class="eyebrow">集患タイプ診断</p>
     <h1>${esc(CLINIC.name)} 様</h1>
-    <p class="lead">貴院の特徴や方針についての8つの質問にお答えいただくと、Googleマップ・AI検索・訪日外国人対策のうち、どこから手をつけるとよいかをまとめてお出しします。</p>
+    <p class="lead">貴院の特徴や方針についての9つの質問にお答えいただくと、Googleマップ・AI検索・訪日外国人対策のうち、どこから手をつけるとよいかをまとめてお出しします。</p>
     <dl class="meta">
-      <dt>質問</dt><dd>8問（ほぼタップのみ・約1分）</dd>
-      <dt>反映する調査</dt><dd>貴院と近隣の${esc(CLINIC.dept)}のGoogleマップの公開情報と、貴院のホームページ</dd>
+      <dt>質問</dt><dd>9問（ほぼタップのみ・約1分）</dd>
+      <dt>反映する調査</dt><dd>${CLINIC.reviews != null ? `貴院と近隣の${esc(CLINIC.dept)}のGoogleマップの公開情報と、` : ""}貴院のホームページの公開情報</dd>
     </dl>
     <button class="btn full" id="start" type="button">診断をはじめる</button>
   </section>
@@ -388,6 +401,7 @@ function renderQuestion() {
     <p class="qnum">質問 ${i + 1} / ${QUESTIONS.length}</p>
     <h2 class="qtext">${q.q}</h2>
     ${q.sub ? `<p class="qsub">${q.sub}</p>` : ""}
+    ${q.mapLink ? `<p class="qsub"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CLINIC.name + " " + (CLINIC.address || ""))}" target="_blank" rel="noopener">Googleマップで貴院の口コミ件数を確認する（別のタブで開きます）</a></p>` : ""}
     ${q.type === "text" ? `
     <label class="field" for="themeIn"><input id="themeIn" type="text" maxlength="30" value="${esc(cur || "")}" placeholder="例）${THEME_EXAMPLES[CLINIC.dept] || "得意な診療"}"></label>
     <button class="btn full" id="themeGo" type="button">診断結果を見る</button>
@@ -415,7 +429,7 @@ function renderQuestion() {
 // 最後の質問のあと、公開情報を集めている間に出す画面。本番は裏側（GAS）の処理が終わるまで表示する。
 function renderCollect() {
   const c = CLINIC, theme = themeText();
-  const steps = [`Googleマップで、貴院と近隣の${esc(c.dept)}の口コミを確認`, "貴院のホームページを確認", "AIが紹介の根拠にする情報（解説ページ・よくある質問）を確認", "英語の情報を確認"];
+  const steps = [c.reviews != null ? `Googleマップで、貴院と近隣の${esc(c.dept)}の口コミを確認` : "ご回答の内容を整理", "貴院のホームページを確認", "AIが紹介の根拠にする情報（解説ページ・よくある質問）を確認", "英語の情報を確認"];
   app.innerHTML = `
   <p class="brand">SelfGrowth株式会社 ｜ ${c.name} 様 集患タイプ診断</p>
   <section class="sheet fade">
