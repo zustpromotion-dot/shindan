@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>集患タイプ診断 | SelfGrowth株式会社</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column like a lab result sheet, one question card at a time, then a long result sheet */
+:root {
+  --bg: #F2F5F4; --surface: #FFFFFF; --ink: #16232A; --muted: #4F5F64; --line: #D6DFDD;
+  --accent: #2A6A63; --accent-ink: #FFFFFF; --accent-soft: #E2EEEB; --chip: #F7F9F8;
+  --memo: #FFF4D2; --memo-ink: #5A4A12;
+  --gA: #2F7A4E; --gB: #5E7F2A; --gC: #A86A12; --gD: #B3442F;
+  --f-display: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #101719; --surface: #172124; --ink: #E4ECEA; --muted: #9AABAA; --line: #2A383B;
+  --accent: #5FB3A8; --accent-ink: #0D1A1A; --accent-soft: #1D3332; --chip: #1B2729;
+  --memo: #3A3216; --memo-ink: #F1E3B0;
+  --gA: #6CC08F; --gB: #A9C46A; --gC: #E0A54E; --gD: #E8806B; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #101719; --surface: #172124; --ink: #E4ECEA; --muted: #9AABAA; --line: #2A383B;
+  --accent: #5FB3A8; --accent-ink: #0D1A1A; --accent-soft: #1D3332; --chip: #1B2729;
+  --memo: #3A3216; --memo-ink: #F1E3B0;
+  --gA: #6CC08F; --gB: #A9C46A; --gC: #E0A54E; --gD: #E8806B; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.75; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.4; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mockbar { border-bottom: 1px dashed var(--line); background: var(--surface);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 8px; }
+.mockbar-in { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.mockbar-in .tag { font-weight: 700; color: var(--memo-ink); background: var(--memo); padding: 2px 8px; border-radius: 4px; }
+.mockbar-in .sp { flex: 1; }
+.mini { border: 1px solid var(--line); background: var(--chip); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.mini[aria-pressed="true"] { background: var(--memo); color: var(--memo-ink); border-color: transparent; }
+
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 64px; display: grid; gap: 24px; }
+.brand { font-size: 12px; letter-spacing: .08em; color: var(--muted); }
+
+.memo { display: none; background: var(--memo); color: var(--memo-ink); font-size: 12.5px; line-height: 1.6; padding: 8px 12px; border-radius: 6px; }
+.memo::before { content: "設計メモ　"; font-weight: 700; }
+body.show-memo .memo { display: block; }
+
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 24px; display: grid; gap: 16px; }
+@media (max-width: 480px) { .sheet { padding: 20px 16px; } }
+.eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.lead { color: var(--muted); }
+.meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 16px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+.meta dt { margin: 0; } .meta dd { margin: 0; color: var(--ink); }
+
+.btn { display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 14px 24px; cursor: pointer; font-family: var(--f-display); font-size: 16px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.full { width: 100%; }
+.link { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px 0; font-size: 13px; text-decoration: underline; }
+
+.progress { display: flex; gap: 4px; }
+.progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.progress span.on { background: var(--accent); }
+.qnum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.qtext { font-size: 20px; }
+.qsub { font-size: 13px; color: var(--muted); }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--chip); border-radius: 8px; padding: 14px 16px; cursor: pointer; font-size: 15px; line-height: 1.5; }
+.opt:hover { border-color: var(--accent); }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+
+.type-name { font-size: 28px; color: var(--accent); }
+.howto { background: var(--accent-soft); border-radius: 8px; padding: 12px 14px; font-size: 14.5px; }
+.section-title { font-size: 17px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 10px 6px 12px; display: grid; gap: 2px; justify-items: center; text-align: center; background: var(--chip); }
+.tile.top { border: 2px solid var(--gD); }
+.tile .name { font-size: 13px; font-weight: 700; }
+.tile .big { font-family: var(--f-display); font-size: 40px; line-height: 1.1; font-weight: 700; }
+.tile .gl { font-size: 12px; font-weight: 700; line-height: 1.4; }
+.tile .imp-s { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+.tile .imp-s b { color: var(--accent); letter-spacing: .05em; }
+.tag-space { height: 20px; }
+
+.axis { display: grid; gap: 12px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+.axis:first-child { padding-top: 4px; }
+.axis:last-child { border-bottom: 0; padding-bottom: 0; }
+.axis-head { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; align-items: center; }
+.gbox { width: 52px; height: 52px; border: 2px solid currentColor; border-radius: 8px; display: grid; place-items: center; font-family: var(--f-display); font-size: 28px; font-weight: 700; }
+.axis-title { display: grid; gap: 2px; min-width: 0; }
+.axis-title h3 { font-size: 17px; }
+.axis-title .priority-tag { vertical-align: 2px; margin-left: 4px; }
+.imp { font-size: 13px; color: var(--muted); }
+.imp span { font-weight: 700; }
+.imp b { color: var(--accent); letter-spacing: .1em; font-weight: 700; }
+.grade { display: inline-flex; align-items: baseline; gap: 6px; border: 1.5px solid currentColor; border-radius: 6px; padding: 2px 10px; font-family: var(--f-display); font-weight: 700; white-space: nowrap; }
+.grade .g { font-size: 18px; }
+.grade .gl { font-size: 11px; }
+.gA { color: var(--gA); } .gB { color: var(--gB); } .gC { color: var(--gC); } .gD { color: var(--gD); }
+.facts { display: grid; font-size: 14.5px; background: var(--chip); border-radius: 8px; padding: 4px 14px; }
+.fact { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding-block: 8px; border-bottom: 1px dashed var(--line); }
+.fact:last-child { border-bottom: 0; }
+.fact .v { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.fact .ref { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); }
+.axis .note { font-size: 14.5px; }
+.priority-tag { font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--gD); padding: 2px 8px; border-radius: 4px; }
+
+.ai-box { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13.5px; }
+.ai-q { background: var(--accent-soft); padding: 10px 14px; font-weight: 700; }
+.ai-a { padding: 12px 14px; display: grid; gap: 6px; }
+.ai-a ol { margin: 0; padding-left: 1.4em; }
+.ai-cap { font-size: 12px; color: var(--muted); }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; min-width: 360px; }
+th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 12px; color: var(--muted); font-weight: 700; }
+td.you, th.you { background: var(--accent-soft); font-weight: 700; }
+
+.plans { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: p; }
+.plans li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 10px; counter-increment: p; }
+.plans li::before { content: counter(p); grid-row: span 2; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.plans h3 { font-size: 15.5px; }
+.plans p { font-size: 14.5px; color: var(--muted); }
+
+.quick { background: var(--accent-soft); border-radius: 8px; padding: 16px; display: grid; gap: 8px; }
+.quick h3 { font-size: 16px; }
+.quick .ex { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 13.5px; }
+.quick .ex-cap { font-size: 12px; color: var(--muted); }
+
+.chips { display: grid; gap: 8px; }
+.chip { display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 1px solid var(--line); background: var(--chip); border-radius: 8px; padding: 12px 14px; cursor: pointer; line-height: 1.5; font-size: 14.5px; }
+.chip .box { flex: none; width: 18px; height: 18px; border: 1.5px solid var(--muted); border-radius: 4px; margin-top: 2px; display: grid; place-items: center; font-size: 12px; color: var(--accent-ink); }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.chip[aria-pressed="true"] .box { background: var(--accent); border-color: var(--accent); }
+.chip.enough { background: transparent; }
+
+.slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.slot { border: 1px solid var(--line); background: var(--chip); border-radius: 8px; padding: 10px; cursor: pointer; line-height: 1.4; font-size: 14px; }
+.slot small { display: block; color: var(--muted); font-size: 12px; }
+.slot[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+.slots.days { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field { display: grid; gap: 4px; font-size: 13.5px; }
+.field select { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; }
+#otherDate { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; margin-top: 8px; }
+.collect { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; font-size: 14.5px; }
+.collect li { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); }
+.collect .mark { flex: none; width: 18px; height: 18px; margin-top: 2px; border: 1.5px solid var(--line); border-radius: 50%; display: grid; place-items: center; font-size: 11px; }
+.collect li.on { color: var(--ink); }
+.collect li.on .mark { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.collect li.on .mark::before { content: "✓"; }
+.field input { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; }
+.tel { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; background: var(--chip); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 13.5px; }
+.tel b { font-variant-numeric: tabular-nums; }
+.picked { font-size: 13.5px; border-left: 3px solid var(--accent); padding-left: 10px; display: grid; gap: 2px; }
+.done { text-align: center; display: grid; gap: 8px; padding-block: 8px; }
+.done h3 { font-size: 18px; }
+.foot { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+
+.savebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+@media print {
+  .mockbar, .memo, .savebar, #q9, .link, .btn { display: none !important; }
+  body { background: #fff; color: #000; }
+  .sheet { break-inside: avoid; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fade { animation: fade .25s ease-out; }
+  @keyframes fade { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+</style>
+</head>
+<body>
+
+<main class="wrap" id="app"></main>
+
+<script>
+// 裏側（SAKIDORIのApps Scriptウェブアプリ）のURL。ops/sheets_webapp.gs をデプロイしたURLを入れる
+const API = "https://script.google.com/macros/s/AKfycbxODXacJedrq7U-DNwO4jzE3c17L_j82yTQg-yAMpHx2xA3V8uuz5_VzPNVUOJZGSem/exec";
+const TOKEN = new URLSearchParams(location.search).get("id") || "";
+let CLINIC = null;   // 医院データ（ページを開いたときに読み込む）
+let DIAG = null;     // ホームページ・AIの確認結果（最後の質問のあとに読み込む）
+let DATE = "";
+
+const api = {
+  get: () => fetch(`${API}?a=clinic&id=${encodeURIComponent(TOKEN)}`).then(r => r.json()),
+  // Content-Type を text/plain にして、事前確認（CORSのプリフライト）なしで送る
+  post: body => fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: TOKEN, ...body }) }).then(r => r.json()),
+  event: (kind, detail = "") => api.post({ a: "event", kind, detail }).catch(() => {})
+};
+
+const QUESTIONS = [
+  { id: "patient", q: "一番来てほしい患者さんは？", opts: [["near","近隣にお住まいの方やご家族"],["work","駅を使う働く世代"],["far","特定の症状で、遠方からも"],["foreign","外国人の方"]] },
+  { id: "strength", q: "貴院の一番の強みは？", opts: [["access","通いやすさ（待ち時間・立地）"],["expert","専門性・専門医"],["care","丁寧な説明・話しやすさ"],["equip","設備・新しい治療"],["hours","夜間・土日の診療"]] },
+  { id: "focus", q: "今後、力を入れたい診療は？", opts: [["general","一般診療（保険）"],["self","自費診療"],["special","専門外来"],["prevent","予防・健診"]] },
+  { id: "route", q: "新しい患者さんは、どこから知って来院することが多いですか？", opts: [["map","Googleマップ"],["hp","ホームページ"],["ref","紹介・口コミ"],["walk","通りがかり"],["unknown","わからない"]] },
+  { id: "reason", q: "患者さんが貴院を選ぶ決め手は、何だと思いますか？", opts: [["near","近さ"],["review","口コミ・評判"],["expert","専門性"],["hours","診療時間"]] },
+  { id: "foreign", q: "外国人の患者さんについて、方針は？", opts: [["yes","積極的に受け入れたい"],["some","対応できる範囲で"],["no","今は考えていない"]] },
+  { id: "web", q: "Web上の情報発信について、院としての考えは？", opts: [["active","積極的にやりたい"],["min","必要な分だけ"],["busy","やりたいが手が回らない"]] },
+  { id: "theme", type: "text", q: "地域で「〇〇といえば、うち」と言われたいことは？", sub: "症状や診療内容を、ひとことでご入力ください" }
+];
+// 8問目の入力例（診療科ごと。リストの診療科で出し分ける）
+const THEME_EXAMPLES = { 皮膚科: "ニキビ治療、子どもの皮膚トラブル", 歯科: "インプラント、小児歯科", 内科: "糖尿病、胃カメラ", 眼科: "白内障手術、ドライアイ", 整形外科: "スポーツのけが、腰痛" };
+// 8問目の入力からタイプ判定に足す点数（キーワードで判定）
+const THEME_KEYWORDS = [[/美容|自費|自由診療|インプラント|矯正|ホワイトニング|審美|シミ|たるみ|脱毛|レーシック/, { jihi: 1 }], [/子ども|こども|小児|キッズ/, { kakari: 1 }], [/英語|外国|インバウンド/, { inbound: 1 }]];
+const themeText = () => (state.answers.theme || "").trim() || `${CLINIC.dept}の診療全般`;
+
+const POINTS = {
+  patient: { near: { kakari: 3 }, work: { ekimae: 3 }, far: { senmon: 3 }, foreign: { inbound: 3 } },
+  strength: { access: { ekimae: 2, kakari: 1 }, expert: { senmon: 2 }, care: { kakari: 2 }, equip: { jihi: 2, senmon: 1 }, hours: { ekimae: 2 } },
+  focus: { general: { kakari: 2 }, self: { jihi: 3 }, special: { senmon: 2 }, prevent: { kakari: 1, ekimae: 1 } },
+  reason: { near: { kakari: 1 }, expert: { senmon: 1 }, hours: { ekimae: 1 } },
+  foreign: { yes: { inbound: 3 }, some: { inbound: 1 } },
+};
+
+const TYPES = {
+  kakari: { name: "地域かかりつけ型", lead: "近くの方やご家族が、長く通うクリニック", imp: { meo: 3, aio: 2, in: 1 },
+    search: t => "Googleマップで、場所と口コミを見比べて決める方がほとんどです。" },
+  ekimae: { name: "駅前通いやすさ型", lead: "駅からさっと通える、働く世代のクリニック", imp: { meo: 3, aio: 2, in: 1 },
+    search: t => "移動中にGoogleマップで探し、診療時間と口コミで決めます。" },
+  senmon: { name: "専門特化型", lead: "症状に悩む方が、遠くからでも選ぶクリニック", imp: { meo: 2, aio: 3, in: 1 },
+    search: t => `「${t}に強い${CLINIC.dept}は？」と、AIに直接相談して探す方が増えています。` },
+  jihi: { name: "自費で選ばれる型", lead: "「ここで受けたい」と選ばれるクリニック", imp: { meo: 2, aio: 3, in: 2 },
+    search: t => "口コミに加えて、AIに評判を聞いて候補を絞る方が増えています。" },
+  inbound: { name: "インバウンド対応型", lead: "外国人の方にも選ばれるクリニック", imp: { meo: 2, aio: 2, in: 3 },
+    search: t => "英語でGoogleマップやAIに聞いて探します。英語の情報がないと候補に入りません。" }
+};
+const TYPE_ORDER = ["kakari", "ekimae", "senmon", "jihi", "inbound"];
+
+const GRADE_LABEL = { A: "良好", B: "軽度の課題", C: "要改善", D: "早めの対策を推奨" };
+const GAP = { A: 0, B: 1, C: 2, D: 3 };
+const AXES = {
+  meo: { title: "Googleマップ（MEO）", short: "Googleマップ",
+    notes: { A: "近隣の中でも口コミが多く、よく見られている状態です。", B: "近隣の上位に近く、あと一歩で目立つ位置です。",
+      C: "近隣の半数以上の医院より口コミが少なく、比べられると埋もれやすい状態です。", D: "近隣の多くの医院より口コミが少なく、候補に入りにくい状態です。" },
+    plan: t => ["口コミの件数を増やす", "会計時のひと声など、無理なく投稿してもらえる流れをつくる。"] },
+  aio: { title: "AI検索（AIO）", short: "AI検索",
+    notes: { A: "AIに紹介されていて、紹介の根拠になる解説ページもそろっています。", B: "AIに紹介されていますが、根拠になる解説ページが少なく、外れやすい状態です。",
+      C: "解説ページはあるものの、AIの紹介にはまだつながっていません。", D: "AIが紹介の根拠にする解説ページが、まだありません。" },
+    plan: t => [`「${t}」の解説ページをつくる`, "症状・治療の流れ・費用の目安をまとめ、AIに紹介の根拠を渡す。"] },
+  in: { title: "訪日外国人（インバウンド）", short: "訪日外国人",
+    notes: { A: "英語で探す方にも見つけてもらえる状態です。", B: "英語の情報はありますが、まだ見つけにくい状態です。",
+      C: "英語対応の記載はあるものの、英語で探す方には届いていない状態です。", D: "英語で探す方からは、ほぼ見えていない状態です。" },
+    plan: t => ["英語の基本情報を載せる", "診療時間・予約方法・対応言語を、Googleマップとホームページに。"] }
+};
+const median = arr => { const s = [...arr].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const down = g => "ABCD"[Math.min(3, "ABCD".indexOf(g) + 1)];
+const yn = (v, y = "あり", n = "なし") => v ? y : n;
+
+// 判定基準（設計メモにも同じ内容を表示）
+// すべて、相手が最後の質問に答えた時点で自動で集められる項目だけで判定する。
+// Googleマップ：近隣20院のうち、貴院より口コミが多い医院の割合で決める（25%未満A／50%未満B／75%未満C／それ以上D）。
+//   評価が近隣の中央値より0.5以上低ければ1段階下げる。
+// AI検索：Geminiに紹介され解説ページ3ページ以上A／紹介のみB／紹介なしで解説ページ3ページ以上C／それ以外D。
+// 訪日外国人：英語でGeminiに紹介・英語ページの両方A／一方B／英語対応の記載だけC／どれもなしD。
+// データが取れなかった項目は grade を null にし、判定・優先順位から外す（推測で埋めない）
+const NO_DATA = { grade: null, note: "", facts: [] };
+function evaluate(c, d) {
+  const out = {};
+  const places = (c.areaPlaces || []).map(p => p.reviews), n = places.length;
+  if (c.reviews != null && n >= 5) {
+    const more = places.filter(v => v > c.reviews).length, share = more / n;
+    const ratings = c.areaPlaces.map(p => p.rating).filter(v => v != null);
+    const medN = median(places), medR = ratings.length ? median(ratings) : null;
+    const base = share < .25 ? "A" : share < .5 ? "B" : share < .75 ? "C" : "D";
+    let meo = base, meoNote = AXES.meo.notes[base];
+    if (c.rating != null && medR != null && c.rating < medR - 0.5) { meo = down(meo); meoNote += "評価が近隣より低いため、判定を1段階下げています。"; }
+    out.meo = { grade: meo, note: meoNote, facts: [
+      ["口コミの件数", `${c.reviews}件`, `近隣${n}院で${more + 1}番目（中央値 ${Math.round(medN)}件）`],
+      ["口コミの評価", c.rating != null ? c.rating.toFixed(1) : "—", medR != null ? `近隣の中央値 ${medR.toFixed(1)}` : ""]] };
+  } else {
+    out.meo = { ...NO_DATA, note: "Googleマップの口コミ件数を確認できなかったため、今回は判定していません。" };
+  }
+  const hp = d.hp || {}, aiJa = d.aiJa, aiEn = d.aiEn;
+  if (aiJa && hp.checked) {
+    const aio = aiJa.hit ? (hp.pages >= 3 ? "A" : "B") : hp.pages >= 3 ? "C" : "D";
+    out.aio = { grade: aio, note: AXES.aio.notes[aio], facts: [
+      ["AI（Gemini）での紹介", yn(aiJa.hit), aiJa.others.length ? `ほかに紹介されたのは${aiJa.others.length}院` : ""],
+      ["症状・治療の解説ページ", hp.pages ? `${hp.pages}ページ` : "なし", "ホームページを確認"],
+      ["よくある質問のページ", yn(hp.faq), ""]] };
+  } else {
+    out.aio = { ...NO_DATA, note: "AI検索またはホームページを確認できなかったため、今回は判定していません。" };
+  }
+  if (aiEn && hp.checked) {
+    const enN = (aiEn.hit ? 1 : 0) + (hp.enPage ? 1 : 0);
+    const inb = enN === 2 ? "A" : enN === 1 ? "B" : hp.enNote ? "C" : "D";
+    out.in = { grade: inb, note: AXES.in.notes[inb], facts: [
+      ["英語でAIに聞いたときの紹介", yn(aiEn.hit), ""],
+      ["英語のページ", yn(hp.enPage), ""],
+      ["英語対応の記載", yn(hp.enNote), ""]] };
+  } else {
+    out.in = { ...NO_DATA, note: "英語での確認ができなかったため、今回は判定していません。" };
+  }
+  return out;
+}
+const QUICK = {
+  meo: { title: "口コミへの返信を始める", body: "治療の効果はうたわず、お礼と改善の姿勢を伝えます。",
+    ex: t => "ご来院いただき、ありがとうございます。待ち時間についてのご意見は、スタッフ全員で共有し、改善に努めてまいります。今後ともよろしくお願いいたします。", cap: "返信の例" },
+  aio: { title: "Googleマップの説明文に、診療内容を具体的に書く", body: "AIはGoogleマップの情報も参考にしています。",
+    ex: t => `${CLINIC.area.replace(/周辺$/, "")}の${CLINIC.dept}です。${t}をはじめ、幅広いお悩みを診療しています。診療時間や予約の方法は、ホームページでご確認いただけます。`, cap: "説明文の例" },
+  in: { title: "Googleマップに、英語の説明を1行足す", body: "実際に対応できる範囲だけを書きましょう。",
+    ex: t => "We are a local clinic. Please contact us in advance if you need English support. Reservations are available by phone or on our website.", cap: "説明文の例" }
+};
+const Q9 = [
+  ["rival", "近隣の上位の医院が、具体的にどんな対策をしているか"],
+  ["hp", "AIに貴院を紹介してもらうために、ホームページのどこを直せばよいか"],
+  ["review", "口コミを増やす方法と、返信の書き方（医療広告ガイドラインの注意点も含めて）"],
+  ["foreign", "外国人の患者さん向けに、何から始めればよいか"]
+];
+const Q9_TIPS = {
+  rival: { title: "AIに紹介された近隣の医院と、貴院の違い", items: () => {
+    const known = ((DIAG.aiJa || {}).others || []).filter(x => x.reviews != null);
+    const avg = known.length ? Math.round(known.reduce((s, x) => s + x.reviews, 0) / known.length) : null;
+    return [avg != null && CLINIC.reviews != null ? `口コミの件数：紹介された医院は平均${avg}件、貴院は${CLINIC.reviews}件` : "口コミの件数：紹介された医院の件数は、お電話で一緒に確認できます",
+      "紹介された医院は、症状・治療ごとの解説ページを持っていることが多い傾向があります",
+      "Googleマップの写真や説明文が充実しているかも、比べるポイントです"]; } },
+  hp: { title: "AIに紹介されやすいホームページの3つの条件", items: () => { const h = DIAG.hp || {};
+    return [`症状名・治療名ごとにページが分かれている（貴院：${h.pages ? h.pages + "ページ" : "なし"}）`, `医師の経歴や専門分野がはっきり書かれている（貴院：${yn(h.doctor)}）`, `患者さんがよく聞く質問と答えがまとまっている（貴院：${yn(h.faq)}）`]; } },
+  review: { title: "口コミを増やすときに気をつけること", items: ["割引や謝礼と引き換えにお願いするのは、Googleの規約違反になります", "会計時のひと声と、QRコードつきのカードが基本です", "返信で治療の効果をうたうと、医療広告ガイドラインに触れるおそれがあります"] },
+  foreign: { title: "まず始めるとよい3つのこと", items: ["Googleマップに英語の説明を1行足す", "英語の診療案内ページを1枚つくる", "対応できる言語と予約の方法をはっきり書く"] }
+};
+const TIMES = [];
+for (let m = 8 * 60; m <= 20 * 60; m += 30) TIMES.push(`${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`);
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const fmtDay = v => { const d = new Date(v + "T00:00"); return `${d.getMonth() + 1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）`; };
+const DAYS = (() => {
+  const out = [], d = new Date();
+  for (let i = 0; i < 5; i++) {
+    const v = ymd(d);
+    out.push([v, i === 0 ? `今日 ${fmtDay(v)}` : fmtDay(v)]);
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+})();
+
+const state = { step: -1, answers: {}, q9: new Set(), enough: false, bridge: null, selfDone: false, day: null, slot: null, submitted: false };
+const app = document.getElementById("app");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const memo = t => "";  // モックの設計メモは本番では出さない
+
+function decideType() {
+  const score = Object.fromEntries(TYPE_ORDER.map(k => [k, 0]));
+  for (const [qid, map] of Object.entries(POINTS)) {
+    const add = map[state.answers[qid]] || {};
+    for (const [k, v] of Object.entries(add)) score[k] += v;
+  }
+  const t = (state.answers.theme || "").trim(), hit = THEME_KEYWORDS.find(([re]) => re.test(t));
+  const add = hit ? hit[1] : t ? { senmon: 1 } : {};
+  for (const [k, v] of Object.entries(add)) score[k] += v;
+  return TYPE_ORDER.reduce((best, k) => score[k] > score[best] ? k : best, TYPE_ORDER[0]);
+}
+function importance(typeKey) {
+  const imp = { ...TYPES[typeKey].imp };
+  if (state.answers.reason === "review" || state.answers.route === "map") imp.meo = 3;
+  if (state.answers.foreign === "yes") imp.in = Math.max(imp.in, 2);
+  if (state.answers.foreign === "no") imp.in = 1;
+  return imp;
+}
+const dots = n => "●".repeat(n) + "○".repeat(3 - n);
+const labelOf = (qid) => { const q = QUESTIONS.find(x => x.id === qid); const o = q.opts.find(x => x[0] === state.answers[qid]); return o ? o[1] : ""; };
+
+function renderIntro() {
+  app.innerHTML = `
+  <p class="brand">SelfGrowth株式会社</p>
+  <section class="sheet fade">
+    <p class="eyebrow">集患タイプ診断</p>
+    <h1>${esc(CLINIC.name)} 様</h1>
+    <p class="lead">貴院の特徴や方針についての8つの質問にお答えいただくと、Googleマップ・AI検索・訪日外国人対策のうち、どこから手をつけるとよいかをまとめてお出しします。</p>
+    <dl class="meta">
+      <dt>質問</dt><dd>8問（ほぼタップのみ・約1分）</dd>
+      <dt>反映する調査</dt><dd>貴院と近隣の${esc(CLINIC.dept)}のGoogleマップ・AI検索の公開情報と、貴院のホームページ</dd>
+    </dl>
+    <button class="btn full" id="start" type="button">診断をはじめる</button>
+  </section>
+  ${memo("文面のURLから最初に開く画面。院名と調査日を出して「自院のための診断」だと伝える。連絡先や営業には一切触れない。<br>※モックの医院は架空。近隣の口コミ件数・評価は2026年11月3日にGoogle検索で調べた実データ。上の「医院」で切り替えると、判定がデータから計算されて変わる。")}`;
+  document.getElementById("start").onclick = () => { state.step = 0; render(); };
+}
+
+function renderQuestion() {
+  const i = state.step, q = QUESTIONS[i], cur = state.answers[q.id];
+  app.innerHTML = `
+  <p class="brand">SelfGrowth株式会社 ｜ ${esc(CLINIC.name)} 様 集患タイプ診断</p>
+  <section class="sheet fade">
+    <div class="progress">${QUESTIONS.map((_, k) => `<span class="${k <= i ? "on" : ""}"></span>`).join("")}</div>
+    <p class="qnum">質問 ${i + 1} / ${QUESTIONS.length}</p>
+    <h2 class="qtext">${q.q}</h2>
+    ${q.sub ? `<p class="qsub">${q.sub}</p>` : ""}
+    ${q.type === "text" ? `
+    <label class="field" for="themeIn"><input id="themeIn" type="text" maxlength="30" value="${esc(cur || "")}" placeholder="例）${THEME_EXAMPLES[CLINIC.dept] || "得意な診療"}"></label>
+    <button class="btn full" id="themeGo" type="button">診断結果を見る</button>
+    <div><button class="link" id="themeSkip" type="button">特にない（診療全般で診断する）</button></div>` : `
+    <div class="opts">${q.opts.map(([v, l]) => `<button class="opt" type="button" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join("")}</div>`}
+    ${i > 0 ? `<div><button class="link" id="back" type="button">← 前の質問に戻る</button></div>` : ""}
+  </section>
+  ${i === 0 ? memo("7問はタップのみ、最後の1問だけひとこと入力。予算や決裁者のような営業っぽい質問は入れない。") : ""}
+  ${q.type === "text" ? memo("入力式にしたので、診療科が変わっても質問を作り直さずに使える。入力例だけ、リストの診療科で出し分ける。入力内容はAIへの質問文と取り組みの見出しに入り、「美容」「インプラント」などの言葉はタイプ判定にも使う。") : ""}
+  ${q.id === "route" || q.id === "reason" || q.id === "web" ? memo("この質問は、電話で深掘りする材料として先に聞いておくもの。タイプ判定や施策の書き分けにも使う。") : ""}`;
+  app.querySelectorAll(".opt").forEach(b => b.onclick = () => {
+    state.answers[q.id] = b.dataset.v;
+    b.setAttribute("aria-pressed", "true");
+    setTimeout(() => { state.step = i + 1; render(); }, 180);
+  });
+  if (q.type === "text") {
+    const go = v => { state.answers[q.id] = v; state.step = "collect"; render(); };
+    document.getElementById("themeGo").onclick = () => go(document.getElementById("themeIn").value.trim());
+    document.getElementById("themeSkip").onclick = () => go("");
+  }
+  const back = document.getElementById("back");
+  if (back) back.onclick = () => { state.step = i - 1; render(); };
+}
+
+// 最後の質問のあと、公開情報を集めている間に出す画面。本番は裏側（GAS）の処理が終わるまで表示する。
+function renderCollect() {
+  const c = CLINIC, theme = themeText();
+  const steps = [`Googleマップで、貴院と近隣の${esc(c.dept)}の口コミを確認`, "貴院のホームページを確認", `AIに「${esc(c.area)}で、${esc(theme)}におすすめの${esc(c.dept)}」を質問`, "英語でもAIに質問"];
+  app.innerHTML = `
+  <p class="brand">SelfGrowth株式会社 ｜ ${c.name} 様 集患タイプ診断</p>
+  <section class="sheet fade">
+    <p class="eyebrow">診断結果を作成しています</p>
+    <h2 class="qtext">貴院の公開情報を調べています</h2>
+    <ul class="collect">${steps.map(t => `<li><span class="mark"></span><span>${t}</span></li>`).join("")}</ul>
+    <p class="qsub">10〜20秒ほどかかります。このままお待ちください。</p>
+  </section>
+  `;
+  const items = app.querySelectorAll(".collect li");
+  items.forEach((li, k) => setTimeout(() => li.classList.add("on"), 1500 * (k + 1)));
+  const wait = new Promise(r => setTimeout(r, 1500 * steps.length + 500));  // 確認の流れが見えるよう最低限は表示する
+  const ask = api.post({ a: "diagnose", theme: (state.answers.theme || "").trim(), answers: state.answers })
+    .catch(() => ({ ok: false }));
+  Promise.all([ask, wait]).then(([d]) => {
+    if (state.step !== "collect") return;
+    DIAG = d && d.ok ? d : { hp: {}, aiJa: null, aiEn: null };
+    state.step = QUESTIONS.length; render();
+  });
+}
+
+function renderResult() {
+  const typeKey = decideType(), type = TYPES[typeKey], imp = importance(typeKey);
+  const theme = themeText();
+  const ev = evaluate(CLINIC, DIAG), c = CLINIC;
+  const gap = k => ev[k].grade ? GAP[ev[k].grade] : -1;  // 判定できなかった項目は最後に回す
+  const ranked = Object.keys(AXES).sort((a, b) => (imp[b] * gap(b)) - (imp[a] * gap(a)) || imp[b] - imp[a]);
+  const top = ev[ranked[0]].grade ? ranked[0] : null;  // どれも判定できなかったときは最優先を出さない
+  const quick = QUICK[top || "meo"];
+
+  const summaryHtml = ["meo", "aio", "in"].map(k => {
+    const a = { ...AXES[k], ...ev[k] };
+    return `<div class="tile${k === top ? " top" : ""}">
+      ${k === top ? `<span class="priority-tag">最優先</span>` : `<span class="tag-space"></span>`}
+      <span class="name">${a.short}</span>
+      <span class="big g${a.grade || ""}">${a.grade || "—"}</span>
+      <span class="gl g${a.grade || ""}">${a.grade ? GRADE_LABEL[a.grade] : "判定なし"}</span>
+      <span class="imp-s">重要度 <b>${dots(imp[k])}</b></span>
+    </div>`;
+  }).join("");
+
+  const axisHtml = ranked.map(k => {
+    const a = { ...AXES[k], ...ev[k] };
+    return `<div class="axis">
+      <div class="axis-head">
+        <span class="gbox g${a.grade || ""}">${a.grade || "—"}</span>
+        <div class="axis-title">
+          <h3>${a.title}${k === top ? ` <span class="priority-tag">最優先</span>` : ""}</h3>
+          <p class="imp">判定：<span class="g${a.grade || ""}">${a.grade ? GRADE_LABEL[a.grade] : "判定なし"}</span>　貴院にとっての重要度：<b>${dots(imp[k])}</b></p>
+        </div>
+      </div>
+      ${a.facts.length ? `<div class="facts">${a.facts.map(([l, v, r]) => `<div class="fact"><span>${l}</span><span class="v">${v}</span>${r ? `<span class="ref">${r}</span>` : ""}</div>`).join("")}</div>` : ""}
+      <p class="note">${a.note}</p>
+    </div>`;
+  }).join("");
+
+  app.innerHTML = `
+  <p class="brand">SelfGrowth株式会社 ｜ ${esc(CLINIC.name)} 様 集患タイプ診断</p>
+
+  <div class="savebar">
+    <button class="mini" id="save" type="button">この診断結果を保存する（PDF）</button>
+  </div>
+  ${memo("院長や事務長に見せたいときのために、結果をPDFで保存できるようにする。保存したPDFには、最後の質問や申し込み欄は入れない。")}
+
+  <section class="sheet fade">
+    <p class="eyebrow">貴院の集患タイプ</p>
+    <h1 class="type-name">${type.name}</h1>
+    <p>${type.lead}。強みは「${labelOf("strength")}」です。</p>
+    <p class="howto"><b>このタイプの患者さんの探し方</b><br>${type.search(theme)}</p>
+  </section>
+  ${memo("タイプは1〜3問目と6・8問目の回答で判定。結果の最初は、必ず肯定的な言葉から始める。")}
+
+  <section class="sheet">
+    <h2 class="section-title">診断結果のまとめ</h2>
+    <div class="summary">${summaryHtml}</div>
+    <p>${top ? `最優先は<b>「${AXES[top].short}」</b>です。` : "今回は公開情報を確認できなかったため、判定を出せませんでした。時間をおいて、もう一度お試しください。"}</p>
+  </section>
+  ${memo("長い結果を読む前に、3つの軸の判定と最優先の項目がひと目で分かるようにする。")}
+
+  <section class="sheet">
+    <h2 class="section-title">項目ごとの結果</h2>
+    <div>${axisHtml}</div>
+  </section>
+  ${memo("重要度はタイプと回答で決まり、判定は事前診断のデータから自動で計算する。重要度が高いのに判定が低い軸を「最優先」にする。結果は盛らない。")}
+
+  ${aiSection(c, theme)}
+  ${memo("AIの回答と近隣比較は、エリア×診療科ごとに1回だけ調べたデータを使い回す。")}
+
+  <section class="sheet">
+    <h2 class="section-title">貴院におすすめの取り組み</h2>
+    <ol class="plans">${ranked.map(k => { const [h, p] = AXES[k].plan(theme); return `<li><h3>${h}</h3><p>${p}</p></li>`; }).join("")}</ol>
+    <div class="quick">
+      <p class="eyebrow">今日から院内でできること</p>
+      <h3>${quick.title}</h3>
+      <p style="font-size:13.5px">${quick.body}</p>
+      <p class="ex-cap">${quick.cap}</p>
+      <p class="ex">${quick.ex(theme)}</p>
+    </div>
+  </section>
+  ${memo("結果は出し惜しみしない。方向性と、院内ですぐできることを1つ具体的に渡してから、最後の質問に進む。")}
+
+  ${state.booked ? `<section class="sheet"><p class="eyebrow">お電話のお申し込み済み</p><p>${esc(state.booked.day)} ${esc(state.booked.time)}ごろに、担当よりお電話いたします。</p></section>` : `
+  <section class="sheet" id="q9">
+    <p class="qnum">最後の質問</p>
+    <h2 class="qtext">結果の中で、もっと詳しく知りたいことはありますか？</h2>
+    <p class="qsub">いくつでも選べます</p>
+    <div class="chips">
+      ${Q9.map(([v, l]) => `<button class="chip" type="button" data-v="${v}" aria-pressed="${state.q9.has(v)}"><span class="box">✓</span><span>${l}</span></button>`).join("")}
+      <button class="chip enough" type="button" data-v="enough" aria-pressed="${state.enough}"><span class="box">✓</span><span>今回は結果だけで十分です</span></button>
+    </div>
+    <div id="next"></div>
+  </section>
+  ${memo("回答の流れのまま9問目として聞く。「結果だけで十分」を選べるので、それ以外を選ぶのは本人の意思。何を選んだかは記録し、こちらから架電するときの話題にも使う。")}`}
+
+  <div class="foot">
+    <p>この診断は、${DATE}時点の公開情報と、ご回答の内容をもとに作成しています。AI検索の結果は、時期や質問の仕方によって変わることがあります。</p>
+    <p>SelfGrowth株式会社</p>
+  </div>`;
+
+  document.getElementById("save").onclick = () => {
+    api.event("save");
+    try { window.print(); } catch (e) {}
+  };
+  app.querySelectorAll("#q9 .chip").forEach(b => b.onclick = () => {
+    const v = b.dataset.v;
+    if (v === "enough") { state.enough = !state.enough; if (state.enough) state.q9.clear(); }
+    else { state.enough = false; state.q9.has(v) ? state.q9.delete(v) : state.q9.add(v); }
+    app.querySelectorAll("#q9 .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.v === "enough" ? state.enough : state.q9.has(c.dataset.v)));
+    renderNext();
+  });
+  renderNext();
+}
+
+// AIの回答と近隣の比較。紹介された医院の名前は出さず、A院・B院…とする
+function aiSection(c, theme) {
+  const ja = DIAG.aiJa;
+  if (!ja) return "";
+  const others = ja.others || [];
+  const L = "ABCDE";
+  const list = others.map((_, i) => `<li>${L[i]}院</li>`).join("") + (ja.hit ? "<li><b>貴院</b></li>" : "");
+  const cell = v => v == null ? "—" : v;
+  const table = others.some(x => x.reviews != null) ? `
+    <div class="tablewrap"><table>
+      <thead><tr><th>項目</th><th class="you">貴院</th>${others.map((_, i) => `<th>${L[i]}院</th>`).join("")}</tr></thead>
+      <tbody>
+        <tr><td>口コミの件数</td><td class="you">${cell(c.reviews)}</td>${others.map(x => `<td>${cell(x.reviews)}</td>`).join("")}</tr>
+        <tr><td>口コミの評価</td><td class="you">${c.rating != null ? c.rating.toFixed(1) : "—"}</td>${others.map(x => `<td>${x.rating != null ? x.rating.toFixed(1) : "—"}</td>`).join("")}</tr>
+      </tbody>
+    </table></div>` : "";
+  return `<section class="sheet">
+    <h2 class="section-title">AIに聞いてみました</h2>
+    <div class="ai-box">
+      <p class="ai-q">「${esc(c.area)}で、${esc(theme)}におすすめの${esc(c.dept)}を教えて」</p>
+      <div class="ai-a">
+        ${list ? `<ol>${list}</ol>` : ""}
+        <p class="ai-cap">Geminiの回答（医院名は伏せています）。${ja.hit ? "貴院も紹介されました。" : "貴院は紹介されませんでした。"}</p>
+      </div>
+    </div>
+    ${table}
+  </section>`;
+}
+
+function renderNext() {
+  const box = document.getElementById("next");
+  if (!box) return;
+  if (state.enough) {
+    api.event("q9", "結果だけで十分");
+    box.innerHTML = `<div class="done fade"><h3>ご回答ありがとうございました</h3><p class="lead">診断結果は、このページでいつでもご覧いただけます。</p></div>
+    ${memo("追いかける表示はしない。診断を完了した病院として記録し、こちらから架電するかは営業側で判断する。")}`;
+    return;
+  }
+  if (!state.q9.size) { box.innerHTML = ""; return; }
+  const tips = Q9.filter(([v]) => state.q9.has(v)).map(([v]) => { const t = Q9_TIPS[v];
+    return `<div class="picked"><b>${t.title}</b>${(typeof t.items === "function" ? t.items() : t.items).map(i => `<span>・${i}</span>`).join("")}</div>`; }).join("");
+  const bridge = `<div style="display:grid;gap:8px">
+      <p class="qnum">このあと、どうされますか？</p>
+      <div class="opts">
+        <button class="opt" type="button" data-b="self" aria-pressed="${state.bridge === "self"}">まずは院内で進めてみる</button>
+        <button class="opt" type="button" data-b="call" aria-pressed="${state.bridge === "call"}">貴院の場合の具体的な進め方を、一度聞いてみたい</button>
+      </div>
+    </div>`;
+  const tail = state.selfDone
+    ? `<div class="done fade"><h3>ご回答ありがとうございました</h3><p class="lead">診断結果は、このページでいつでもご覧いただけます。</p></div>`
+    : `<button class="btn full" id="decide" type="button" ${state.bridge ? "" : "disabled"}>決定する</button>`;
+  box.innerHTML = `<div class="fade" style="display:grid;gap:16px;border-top:1px solid var(--line);padding-top:16px">
+    <p class="eyebrow">選んでいただいた内容のポイント</p>
+    ${tips}
+    ${memo("選んだ内容について、まずページ上で要点を返す。いきなり電話を出さず、価値を渡してから次の行動を本人に選んでもらう。")}
+    ${bridge}
+    ${memo("選んで「決定する」を押す形。「聞いてみたい」なら電話の申し込みは次の画面に分ける。「院内で進める」を選んだ人も診断完了として記録し、架電するかは営業側で判断する。")}
+    ${tail}
+  </div>`;
+  box.querySelectorAll("[data-b]").forEach(b => b.onclick = () => {
+    state.bridge = b.dataset.b; state.selfDone = false;
+    box.querySelectorAll("[data-b]").forEach(o => o.setAttribute("aria-pressed", o.dataset.b === state.bridge));
+    const d = document.getElementById("decide");
+    if (d) d.disabled = false; else renderNext();
+  });
+  const decide = document.getElementById("decide");
+  if (decide) decide.onclick = () => {
+    if (state.bridge === "call") { state.submitted = false; state.day = null; state.step = "call"; render(); }
+    else { state.selfDone = true; api.event("self", [...state.q9].join(",")); renderNext(); }
+  };
+}
+
+function renderCall() {
+  const picked = Q9.filter(([v]) => state.q9.has(v)).map(([, l]) => `<span>・${l}</span>`).join("");
+  if (state.submitted) {
+    app.innerHTML = `
+    <p class="brand">SelfGrowth株式会社 ｜ ${esc(CLINIC.name)} 様 集患タイプ診断</p>
+    <section class="sheet fade"><div class="done">
+      <h2 class="qtext">お申し込みを受け付けました</h2>
+      <p class="lead">${esc(state.booked.day)} ${esc(state.booked.time)}ごろに、担当よりお電話いたします。</p>
+      <div><button class="link" id="toResult" type="button">診断結果に戻る</button></div>
+    </div></section>`;
+    document.getElementById("toResult").onclick = () => { state.step = QUESTIONS.length; render(); };
+    return;
+  }
+  app.innerHTML = `
+  <p class="brand">SelfGrowth株式会社 ｜ ${esc(CLINIC.name)} 様 集患タイプ診断</p>
+  <section class="sheet fade" id="callbox">
+    <p class="eyebrow">具体的な進め方のご相談</p>
+    <h2 class="qtext">お電話の日時と連絡先をご入力ください</h2>
+    <div class="picked"><b>お伝えする内容</b>${picked}</div>
+    <p>ホームページやGoogleマップの実際の画面を一緒に見ながら、どこから、どう直すとよいかをお伝えします。院内でどこまで手が回るかも伺いながら、無理のない進め方を一緒に考えます（10分ほど）。</p>
+    <div class="field"><span>ご希望の日にち</span>
+      <div class="slots days">${DAYS.map(([v, l]) => `<button class="slot day" type="button" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}
+        <button class="slot day" type="button" data-v="other" aria-pressed="false">その他の日</button></div>
+      <input id="otherDate" type="date" min="${DAYS[0][0]}" hidden>
+    </div>
+    <label class="field" for="time">ご希望の時間
+      <select id="time"><option value="">時間を選んでください</option></select></label>
+    <label class="field" for="tel">お電話番号
+      <input id="tel" type="tel" inputmode="tel" autocomplete="off" placeholder="例）03-0000-0000">
+      <span class="qsub">代表番号でも、ご担当者様に直接つながる番号でも構いません。</span></label>
+    <label class="field" for="person">ご担当者様のお名前
+      <input id="person" type="text" autocomplete="off" placeholder="例）受付 山田"></label>
+    <p class="qsub">お預かりしたお電話番号とお名前は、このご連絡のためだけに使います。</p>
+    <button class="btn full" id="apply" type="button" disabled>この内容で申し込む</button>
+    <div><button class="link" id="toResult" type="button">← 診断結果に戻る</button></div>
+  </section>
+  ${memo("電話でしかできない理由は「実際の画面を一緒に見る」「院内の体制を聞く」。ページで出せる情報を理由にしない。日にちは今日から5日分と「その他の日」。時間は30分単位で、今日を選んだときは今から30分後以降だけを出す。電話番号と名前は必須。")}`;
+  document.getElementById("toResult").onclick = () => { state.step = QUESTIONS.length; render(); };
+  const box = document.getElementById("callbox");
+  const $ = id => document.getElementById(id);
+  const tel = $("tel"), person = $("person"), time = $("time"), other = $("otherDate"), apply = $("apply");
+  const dayValue = () => state.day === "other" ? other.value : state.day;
+  const fillTimes = () => {
+    const keep = time.value, now = new Date();
+    const isToday = dayValue() === DAYS[0][0];
+    const minMin = isToday ? now.getHours() * 60 + now.getMinutes() + 30 : 0;
+    time.innerHTML = `<option value="">時間を選んでください</option>` + TIMES
+      .filter(t => { const [h, m] = t.split(":").map(Number); return h * 60 + m >= minMin; })
+      .map(t => `<option value="${t}">${t}〜</option>`).join("");
+    time.value = [...time.options].some(o => o.value === keep) ? keep : "";
+  };
+  const check = () => { apply.disabled = !(dayValue() && time.value && tel.value.replace(/\D/g, "").length >= 10 && person.value.trim()); };
+  box.querySelectorAll(".day").forEach(b => b.onclick = () => {
+    state.day = b.dataset.v;
+    box.querySelectorAll(".day").forEach(s => s.setAttribute("aria-pressed", s.dataset.v === state.day));
+    other.hidden = state.day !== "other";
+    fillTimes(); check();
+  });
+  other.onchange = () => { fillTimes(); check(); };
+  time.onchange = tel.oninput = person.oninput = check;
+  fillTimes();
+  apply.onclick = () => {
+    const booked = { day: fmtDay(dayValue()), time: time.value };
+    apply.disabled = true; apply.textContent = "送信しています…";
+    api.post({ a: "call", day: booked.day, time: booked.time, tel: tel.value.trim(), person: person.value.trim(),
+               topics: Q9.filter(([v]) => state.q9.has(v)).map(([, l]) => l) })
+      .then(r => {
+        if (!r.ok) throw new Error(r.error);
+        state.booked = booked; state.submitted = true; renderCall(); window.scrollTo(0, 0);
+      })
+      .catch(() => {
+        apply.textContent = "この内容で申し込む"; check();
+        let err = document.getElementById("callErr");
+        if (!err) { err = document.createElement("p"); err.id = "callErr"; err.className = "qsub"; apply.before(err); }
+        err.textContent = "送信できませんでした。電話番号をご確認のうえ、もう一度お試しください。";
+      });
+  };
+}
+
+function render() {
+  if (state.step === "call") renderCall();
+  else if (state.step === "collect") renderCollect();
+  else if (state.step < 0) renderIntro();
+  else if (state.step < QUESTIONS.length) renderQuestion();
+  else renderResult();
+  window.scrollTo(0, 0);
+}
+
+function renderError(msg) {
+  app.innerHTML = `<p class="brand">SelfGrowth株式会社</p><section class="sheet fade"><h2 class="qtext">診断ページを開けませんでした</h2><p>${msg}</p></section>`;
+}
+
+app.innerHTML = `<p class="brand">SelfGrowth株式会社</p><section class="sheet"><p>読み込んでいます…</p></section>`;
+if (!TOKEN) renderError("URLが正しくありません。お送りしたメッセージのURLから、もう一度お開きください。");
+else api.get().then(r => {
+  if (!r.ok) return renderError("URLが正しくないか、有効期限が切れています。お送りしたメッセージのURLから、もう一度お開きください。");
+  CLINIC = r.clinic; DATE = r.date; render();
+}).catch(() => renderError("通信できませんでした。時間をおいて、もう一度お試しください。"));
+</script>
+</body>
+</html>
