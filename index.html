@@ -152,6 +152,9 @@ td.you, th.you { background: var(--accent-soft); font-weight: 700; }
 .field select { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; }
 #otherDate { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--chip); color: var(--ink); width: 100%; margin-top: 8px; }
 .qsub a { color: var(--accent); font-weight: 700; }
+.demobar { background: var(--memo); color: var(--memo-ink); font-size: 12.5px; line-height: 1.6; padding: 8px 16px; text-align: center; }
+.demobar a { color: inherit; font-weight: 700; margin-left: 6px; }
+@media print { .demobar { display: none; } }
 .collect { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; font-size: 14.5px; }
 .collect li { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); }
 .collect .mark { flex: none; width: 18px; height: 18px; margin-top: 2px; border: 1.5px solid var(--line); border-radius: 50%; display: grid; place-items: center; font-size: 11px; }
@@ -185,7 +188,10 @@ td.you, th.you { background: var(--accent-soft); font-weight: 700; }
 <script>
 // 裏側（SAKIDORIのApps Scriptウェブアプリ）のURL。ops/sheets_webapp.gs をデプロイしたURLを入れる
 const API = "https://script.google.com/macros/s/AKfycbxODXacJedrq7U-DNwO4jzE3c17L_j82yTQg-yAMpHx2xA3V8uuz5_VzPNVUOJZGSem/exec";
-const TOKEN = new URLSearchParams(location.search).get("id") || "";
+const PARAMS = new URLSearchParams(location.search);
+const TOKEN = PARAMS.get("id") || "";
+// お試し版（?demo=1、診療科を変えるなら ?demo=歯科 など）：架空の医院で動かし、裏側には一切送らない（記録・通知なし）
+const DEMO = PARAMS.has("demo") && !TOKEN;
 let CLINIC = null;   // 医院データ（ページを開いたときに読み込む）
 let DIAG = null;     // ホームページ・AIの確認結果（最後の質問のあとに読み込む）
 let DATE = "";
@@ -196,6 +202,16 @@ const api = {
   post: body => fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: TOKEN, ...body }) }).then(r => r.json()),
   event: (kind, detail = "") => api.post({ a: "event", kind, detail }).catch(() => {})
 };
+if (DEMO) {
+  const dept = ["皮膚科", "歯科", "内科", "眼科", "整形外科"].includes(PARAMS.get("demo")) ? PARAMS.get("demo") : "皮膚科";
+  const d = new Date();
+  api.get = () => Promise.resolve({ ok: true, date: `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
+    clinic: { name: `（お試し）サンプル${dept}クリニック`, dept, area: "恵比寿周辺", address: "東京都渋谷区恵比寿", reviews: null, rating: null, areaPlaces: [] } });
+  api.post = body => new Promise(r => setTimeout(() => r(body.a === "diagnose"
+    ? { ok: true, hp: { checked: true, pages: 4, faq: false, doctor: true, enPage: false, enNote: true } } : { ok: true }), 300));
+  document.body.insertAdjacentHTML("afterbegin", `<div class="demobar">お試し版です（架空の医院・ホームページの確認結果は見本）。回答や電話の申し込みは記録・通知されません。
+    <a href="?demo=${encodeURIComponent(dept)}">最初からやり直す</a></div>`);
+}
 
 const QUESTIONS = [
   { id: "patient", q: "一番来てほしい患者さんは？", opts: [["near","近隣にお住まいの方やご家族"],["work","駅を使う働く世代"],["far","特定の症状で、遠方からも"],["foreign","外国人の方"]] },
@@ -698,7 +714,7 @@ function renderError(msg) {
 }
 
 app.innerHTML = `<p class="brand">SelfGrowth株式会社</p><section class="sheet"><p>読み込んでいます…</p></section>`;
-if (!TOKEN) renderError("URLが正しくありません。お送りしたメッセージのURLから、もう一度お開きください。");
+if (!TOKEN && !DEMO) renderError("URLが正しくありません。お送りしたメッセージのURLから、もう一度お開きください。");
 else api.get().then(r => {
   if (!r.ok) return renderError("URLが正しくないか、有効期限が切れています。お送りしたメッセージのURLから、もう一度お開きください。");
   CLINIC = r.clinic; DATE = r.date; render();
