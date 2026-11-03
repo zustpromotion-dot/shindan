@@ -242,24 +242,22 @@ const AXES = {
       C: "近隣の半数以上の医院より口コミが少なく、比べられると埋もれやすい状態です。", D: "近隣の多くの医院より口コミが少なく、候補に入りにくい状態です。" },
     plan: t => ["口コミの件数を増やす", "会計時のひと声など、無理なく投稿してもらえる流れをつくる。"] },
   aio: { title: "AI検索（AIO）", short: "AI検索",
-    notes: { A: "AIに紹介されていて、紹介の根拠になる解説ページもそろっています。", B: "AIに紹介されていますが、根拠になる解説ページが少なく、外れやすい状態です。",
-      C: "解説ページはあるものの、AIの紹介にはまだつながっていません。", D: "AIが紹介の根拠にする解説ページが、まだありません。" },
+    notes: { A: "症状・治療の解説、よくある質問、医師の紹介がそろっていて、AIが紹介の根拠にしやすい状態です。",
+      B: "解説ページはありますが、よくある質問や医師の紹介が足りず、根拠としてはもう一歩の状態です。",
+      C: "解説ページが少なく、AIが紹介の根拠にしにくい状態です。", D: "AIが紹介の根拠にする解説ページが、まだありません。" },
     plan: t => [`「${t}」の解説ページをつくる`, "症状・治療の流れ・費用の目安をまとめ、AIに紹介の根拠を渡す。"] },
   in: { title: "訪日外国人（インバウンド）", short: "訪日外国人",
-    notes: { A: "英語で探す方にも見つけてもらえる状態です。", B: "英語の情報はありますが、まだ見つけにくい状態です。",
-      C: "英語対応の記載はあるものの、英語で探す方には届いていない状態です。", D: "英語で探す方からは、ほぼ見えていない状態です。" },
+    notes: { A: "英語のページと対応の案内があり、英語で探す方にも伝わる状態です。", B: "英語のページはありますが、英語で対応できることの案内が見当たりません。",
+      C: "英語対応の記載はありますが、英語で読めるページがありません。", D: "英語の情報がなく、英語で探す方からはほぼ見えていない状態です。" },
     plan: t => ["英語の基本情報を載せる", "診療時間・予約方法・対応言語を、Googleマップとホームページに。"] }
 };
 const median = arr => { const s = [...arr].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const down = g => "ABCD"[Math.min(3, "ABCD".indexOf(g) + 1)];
 const yn = (v, y = "あり", n = "なし") => v ? y : n;
 
-// 判定基準（設計メモにも同じ内容を表示）
-// すべて、相手が最後の質問に答えた時点で自動で集められる項目だけで判定する。
-// Googleマップ：近隣20院のうち、貴院より口コミが多い医院の割合で決める（25%未満A／50%未満B／75%未満C／それ以上D）。
+// 判定基準（AI検索・訪日外国人は evaluate 内のコメント参照）
+// Googleマップ：近隣の医院のうち、貴院より口コミが多い医院の割合で決める（25%未満A／50%未満B／75%未満C／それ以上D）。
 //   評価が近隣の中央値より0.5以上低ければ1段階下げる。
-// AI検索：Geminiに紹介され解説ページ3ページ以上A／紹介のみB／紹介なしで解説ページ3ページ以上C／それ以外D。
-// 訪日外国人：英語でGeminiに紹介・英語ページの両方A／一方B／英語対応の記載だけC／どれもなしD。
 // データが取れなかった項目は grade を null にし、判定・優先順位から外す（推測で埋めない）
 const NO_DATA = { grade: null, note: "", facts: [] };
 function evaluate(c, d) {
@@ -278,25 +276,23 @@ function evaluate(c, d) {
   } else {
     out.meo = { ...NO_DATA, note: "Googleマップの口コミ件数を確認できなかったため、今回は判定していません。" };
   }
-  const hp = d.hp || {}, aiJa = d.aiJa, aiEn = d.aiEn;
-  if (aiJa && hp.checked) {
-    const aio = aiJa.hit ? (hp.pages >= 3 ? "A" : "B") : hp.pages >= 3 ? "C" : "D";
+  // AI検索・訪日外国人：AIに実際に聞くのは無料ではできないため、ホームページの中身からパターンで判定する
+  //   AI検索　　：解説ページ10以上＋よくある質問＋医師紹介でA／解説3以上＋（質問か医師紹介）でB／解説1以上か質問ありでC／それ以外D
+  //   訪日外国人：英語ページ＋英語対応の記載でA／英語ページのみB／記載のみC／どちらもなしD
+  const hp = d.hp || {};
+  if (hp.checked) {
+    const aio = hp.pages >= 10 && hp.faq && hp.doctor ? "A" : hp.pages >= 3 && (hp.faq || hp.doctor) ? "B" : hp.pages >= 1 || hp.faq ? "C" : "D";
     out.aio = { grade: aio, note: AXES.aio.notes[aio], facts: [
-      ["AI（Gemini）での紹介", yn(aiJa.hit), aiJa.others.length ? `ほかに紹介されたのは${aiJa.others.length}院` : ""],
-      ["症状・治療の解説ページ", hp.pages ? `${hp.pages}ページ` : "なし", "ホームページを確認"],
-      ["よくある質問のページ", yn(hp.faq), ""]] };
-  } else {
-    out.aio = { ...NO_DATA, note: "AI検索またはホームページを確認できなかったため、今回は判定していません。" };
-  }
-  if (aiEn && hp.checked) {
-    const enN = (aiEn.hit ? 1 : 0) + (hp.enPage ? 1 : 0);
-    const inb = enN === 2 ? "A" : enN === 1 ? "B" : hp.enNote ? "C" : "D";
+      ["症状・治療の解説ページ", hp.pages ? `${hp.pages}ページ` : "なし", "AIが紹介の根拠にしやすい情報"],
+      ["よくある質問のページ", yn(hp.faq), ""],
+      ["医師の紹介", yn(hp.doctor), ""]] };
+    const inb = hp.enPage && hp.enNote ? "A" : hp.enPage ? "B" : hp.enNote ? "C" : "D";
     out.in = { grade: inb, note: AXES.in.notes[inb], facts: [
-      ["英語でAIに聞いたときの紹介", yn(aiEn.hit), ""],
       ["英語のページ", yn(hp.enPage), ""],
-      ["英語対応の記載", yn(hp.enNote), ""]] };
+      ["英語で対応できることの記載", yn(hp.enNote), ""]] };
   } else {
-    out.in = { ...NO_DATA, note: "英語での確認ができなかったため、今回は判定していません。" };
+    out.aio = { ...NO_DATA, note: "ホームページを確認できなかったため、今回は判定していません。" };
+    out.in = { ...NO_DATA, note: "ホームページを確認できなかったため、今回は判定していません。" };
   }
   return out;
 }
@@ -315,11 +311,11 @@ const Q9 = [
   ["foreign", "外国人の患者さん向けに、何から始めればよいか"]
 ];
 const Q9_TIPS = {
-  rival: { title: "AIに紹介された近隣の医院と、貴院の違い", items: () => {
-    const known = ((DIAG.aiJa || {}).others || []).filter(x => x.reviews != null);
-    const avg = known.length ? Math.round(known.reduce((s, x) => s + x.reviews, 0) / known.length) : null;
-    return [avg != null && CLINIC.reviews != null ? `口コミの件数：紹介された医院は平均${avg}件、貴院は${CLINIC.reviews}件` : "口コミの件数：紹介された医院の件数は、お電話で一緒に確認できます",
-      "紹介された医院は、症状・治療ごとの解説ページを持っていることが多い傾向があります",
+  rival: { title: "近隣の医院と、貴院の違い", items: () => {
+    const top = (CLINIC.areaPlaces || []).map(p => p.reviews).sort((a, b) => b - a).slice(0, 3);
+    const avg = top.length === 3 ? Math.round(top.reduce((s, v) => s + v, 0) / 3) : null;
+    return [avg != null && CLINIC.reviews != null ? `口コミの件数：近隣の上位3院は平均${avg}件、貴院は${CLINIC.reviews}件` : "口コミの件数：近隣の上位の医院との差は、お電話で一緒に確認できます",
+      "上位の医院は、症状・治療ごとの解説ページを持っていることが多い傾向があります",
       "Googleマップの写真や説明文が充実しているかも、比べるポイントです"]; } },
   hp: { title: "AIに紹介されやすいホームページの3つの条件", items: () => { const h = DIAG.hp || {};
     return [`症状名・治療名ごとにページが分かれている（貴院：${h.pages ? h.pages + "ページ" : "なし"}）`, `医師の経歴や専門分野がはっきり書かれている（貴院：${yn(h.doctor)}）`, `患者さんがよく聞く質問と答えがまとまっている（貴院：${yn(h.faq)}）`]; } },
@@ -375,7 +371,7 @@ function renderIntro() {
     <p class="lead">貴院の特徴や方針についての8つの質問にお答えいただくと、Googleマップ・AI検索・訪日外国人対策のうち、どこから手をつけるとよいかをまとめてお出しします。</p>
     <dl class="meta">
       <dt>質問</dt><dd>8問（ほぼタップのみ・約1分）</dd>
-      <dt>反映する調査</dt><dd>貴院と近隣の${esc(CLINIC.dept)}のGoogleマップ・AI検索の公開情報と、貴院のホームページ</dd>
+      <dt>反映する調査</dt><dd>貴院と近隣の${esc(CLINIC.dept)}のGoogleマップの公開情報と、貴院のホームページ</dd>
     </dl>
     <button class="btn full" id="start" type="button">診断をはじめる</button>
   </section>
@@ -419,24 +415,24 @@ function renderQuestion() {
 // 最後の質問のあと、公開情報を集めている間に出す画面。本番は裏側（GAS）の処理が終わるまで表示する。
 function renderCollect() {
   const c = CLINIC, theme = themeText();
-  const steps = [`Googleマップで、貴院と近隣の${esc(c.dept)}の口コミを確認`, "貴院のホームページを確認", `AIに「${esc(c.area)}で、${esc(theme)}におすすめの${esc(c.dept)}」を質問`, "英語でもAIに質問"];
+  const steps = [`Googleマップで、貴院と近隣の${esc(c.dept)}の口コミを確認`, "貴院のホームページを確認", "AIが紹介の根拠にする情報（解説ページ・よくある質問）を確認", "英語の情報を確認"];
   app.innerHTML = `
   <p class="brand">SelfGrowth株式会社 ｜ ${c.name} 様 集患タイプ診断</p>
   <section class="sheet fade">
     <p class="eyebrow">診断結果を作成しています</p>
     <h2 class="qtext">貴院の公開情報を調べています</h2>
     <ul class="collect">${steps.map(t => `<li><span class="mark"></span><span>${t}</span></li>`).join("")}</ul>
-    <p class="qsub">10〜20秒ほどかかります。このままお待ちください。</p>
+    <p class="qsub">10秒ほどかかります。このままお待ちください。</p>
   </section>
   `;
   const items = app.querySelectorAll(".collect li");
-  items.forEach((li, k) => setTimeout(() => li.classList.add("on"), 1500 * (k + 1)));
-  const wait = new Promise(r => setTimeout(r, 1500 * steps.length + 500));  // 確認の流れが見えるよう最低限は表示する
+  items.forEach((li, k) => setTimeout(() => li.classList.add("on"), 1200 * (k + 1)));
+  const wait = new Promise(r => setTimeout(r, 1200 * steps.length + 500));  // 確認の流れが見えるよう最低限は表示する
   const ask = api.post({ a: "diagnose", theme: (state.answers.theme || "").trim(), answers: state.answers })
     .catch(() => ({ ok: false }));
   Promise.all([ask, wait]).then(([d]) => {
     if (state.step !== "collect") return;
-    DIAG = d && d.ok ? d : { hp: {}, aiJa: null, aiEn: null };
+    DIAG = d && d.ok ? d : { hp: {} };
     state.step = QUESTIONS.length; render();
   });
 }
@@ -505,7 +501,6 @@ function renderResult() {
   </section>
   ${memo("重要度はタイプと回答で決まり、判定は事前診断のデータから自動で計算する。重要度が高いのに判定が低い軸を「最優先」にする。結果は盛らない。")}
 
-  ${aiSection(c, theme)}
   ${memo("AIの回答と近隣比較は、エリア×診療科ごとに1回だけ調べたデータを使い回す。")}
 
   <section class="sheet">
@@ -535,7 +530,7 @@ function renderResult() {
   ${memo("回答の流れのまま9問目として聞く。「結果だけで十分」を選べるので、それ以外を選ぶのは本人の意思。何を選んだかは記録し、こちらから架電するときの話題にも使う。")}`}
 
   <div class="foot">
-    <p>この診断は、${DATE}時点の公開情報と、ご回答の内容をもとに作成しています。AI検索の結果は、時期や質問の仕方によって変わることがあります。</p>
+    <p>この診断は、${DATE}時点の公開情報と、ご回答の内容をもとに作成しています。AI検索の判定は、AIが紹介の根拠にしやすい情報がホームページにそろっているかを見たもので、実際の表示を保証するものではありません。</p>
     <p>SelfGrowth株式会社</p>
   </div>`;
 
@@ -551,35 +546,6 @@ function renderResult() {
     renderNext();
   });
   renderNext();
-}
-
-// AIの回答と近隣の比較。紹介された医院の名前は出さず、A院・B院…とする
-function aiSection(c, theme) {
-  const ja = DIAG.aiJa;
-  if (!ja) return "";
-  const others = ja.others || [];
-  const L = "ABCDE";
-  const list = others.map((_, i) => `<li>${L[i]}院</li>`).join("") + (ja.hit ? "<li><b>貴院</b></li>" : "");
-  const cell = v => v == null ? "—" : v;
-  const table = others.some(x => x.reviews != null) ? `
-    <div class="tablewrap"><table>
-      <thead><tr><th>項目</th><th class="you">貴院</th>${others.map((_, i) => `<th>${L[i]}院</th>`).join("")}</tr></thead>
-      <tbody>
-        <tr><td>口コミの件数</td><td class="you">${cell(c.reviews)}</td>${others.map(x => `<td>${cell(x.reviews)}</td>`).join("")}</tr>
-        <tr><td>口コミの評価</td><td class="you">${c.rating != null ? c.rating.toFixed(1) : "—"}</td>${others.map(x => `<td>${x.rating != null ? x.rating.toFixed(1) : "—"}</td>`).join("")}</tr>
-      </tbody>
-    </table></div>` : "";
-  return `<section class="sheet">
-    <h2 class="section-title">AIに聞いてみました</h2>
-    <div class="ai-box">
-      <p class="ai-q">「${esc(c.area)}で、${esc(theme)}におすすめの${esc(c.dept)}を教えて」</p>
-      <div class="ai-a">
-        ${list ? `<ol>${list}</ol>` : ""}
-        <p class="ai-cap">Geminiの回答（医院名は伏せています）。${ja.hit ? "貴院も紹介されました。" : "貴院は紹介されませんでした。"}</p>
-      </div>
-    </div>
-    ${table}
-  </section>`;
 }
 
 function renderNext() {
