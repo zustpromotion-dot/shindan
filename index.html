@@ -707,7 +707,45 @@ function render() {
   else if (state.step < QUESTIONS.length) renderQuestion();
   else renderResult();
   window.scrollTo(0, 0);
+  trackView();
 }
+
+// ---------- 閲覧の記録（何秒見ていたか・結果をどこまで読んだか。お名前などは送らない） ----------
+const VIEW = { visibleMs: 0, since: Date.now(), resultMs: 0, resultSince: 0, where: "はじめの画面", reached: false, callOpened: false, leaves: 0 };
+function viewTick() {  // 画面を見ていた時間を足し込む
+  const now = Date.now();
+  if (VIEW.since) VIEW.visibleMs += now - VIEW.since;
+  if (VIEW.resultSince) VIEW.resultMs += now - VIEW.resultSince;
+  VIEW.since = document.visibilityState === "visible" ? now : 0;
+  VIEW.resultSince = VIEW.since && VIEW.where === "診断結果" ? now : 0;
+}
+function trackView() {
+  viewTick();
+  VIEW.where = state.step === "call" ? "電話申込の画面" : state.step === "collect" ? "最後の質問"
+    : state.step < 0 ? "はじめの画面" : state.step < QUESTIONS.length ? `質問${state.step + 1}` : "診断結果";
+  if (VIEW.where === "診断結果" && VIEW.since) VIEW.resultSince = Date.now();
+  if (VIEW.where === "電話申込の画面" && !VIEW.callOpened) { VIEW.callOpened = true; api.event("callview"); }
+  const q9 = document.getElementById("q9");
+  if (q9 && !VIEW.reached && "IntersectionObserver" in window) {
+    const ob = new IntersectionObserver(es => {
+      if (es.some(e => e.isIntersecting) && !VIEW.reached) { VIEW.reached = true; ob.disconnect(); api.event("reach", "q9"); }
+    });
+    ob.observe(q9);
+  }
+}
+function sendLeave() {  // 画面を閉じた・別のアプリに切り替えたときに、見ていた時間を送る（1回の表示で最大5回）
+  viewTick();
+  if (DEMO || !TOKEN || VIEW.leaves >= 5 || VIEW.visibleMs < 1000) return;
+  VIEW.leaves++;
+  const detail = JSON.stringify({ sec: Math.round(VIEW.visibleMs / 1000), resultSec: Math.round(VIEW.resultMs / 1000), where: VIEW.where });
+  const body = JSON.stringify({ id: TOKEN, a: "event", kind: "leave", detail });
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon(API, new Blob([body], { type: "text/plain;charset=utf-8" }))) return;
+  } catch (e) {}
+  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body, keepalive: true }).catch(() => {});
+}
+document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" ? sendLeave() : viewTick());
+window.addEventListener("pagehide", sendLeave);
 
 function renderError(msg) {
   app.innerHTML = `<p class="brand">SelfGrowth株式会社</p><section class="sheet fade"><h2 class="qtext">診断ページを開けませんでした</h2><p>${msg}</p></section>`;
