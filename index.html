@@ -221,7 +221,7 @@ const QUESTIONS = [
   { id: "gmap", q: "貴院のGoogleマップの口コミは、何件くらいありますか？", sub: "だいたいで構いません", mapLink: true, opts: [["lt30","30件未満"],["lt100","30〜100件"],["lt300","100〜300件"],["ge300","300件以上"]] },
   { id: "reason", q: "患者さんが貴院を選ぶ決め手は、何だと思いますか？", opts: [["near","近さ"],["review","口コミ・評判"],["expert","専門性"],["hours","診療時間"]] },
   { id: "foreign", q: "外国人の患者さんについて、方針は？", opts: [["yes","積極的に受け入れたい"],["some","対応できる範囲で"],["no","今は考えていない"]] },
-  { id: "web", q: "Web上の情報発信について、院としての考えは？", opts: [["active","積極的にやりたい"],["min","必要な分だけ"],["busy","やりたいが手が回らない"]] },
+  { id: "setup", q: "Googleマップやホームページの対策は、今どうされていますか？", opts: [["inhouse","院内で取り組んでいる"],["vendor","業者に任せている"],["busy","やりたいが、手が回っていない"],["none","特に考えていない"]] },
   { id: "theme", type: "text", q: "地域で「〇〇といえば、うち」と言われたいことは？", sub: "症状や診療内容を、ひとことでご入力ください" }
 ];
 // 最後の質問（入力式）の入力例（診療科ごと。リストの診療科で出し分ける）
@@ -333,6 +333,30 @@ const QUICK = {
   in: { title: "Googleマップに、英語の説明を1行足す", body: "実際に対応できる範囲だけを書きましょう。",
     ex: t => "We are a local clinic. Please contact us in advance if you need English support. Reservations are available by phone or on our website.", cap: "説明文の例" }
 };
+// 7問目で「業者に任せている」と答えた医院には、院内でやることの代わりに、業者に確認するとよいことを出す
+const VENDOR_CHECK = {
+  meo: ["口コミの件数が、毎月どれくらい増えているか", "口コミへの返信を、誰がどのくらいの頻度でしているか", "Googleマップの写真や説明文を、最後にいつ更新したか"],
+  aio: ["症状・治療ごとの解説ページを、増やす予定があるか", "AI検索（ChatGPTやGeminiなど）への対策が、契約の範囲に入っているか", "よくある質問のページを作る予定があるか"],
+  in: ["英語のページや、Googleマップの英語の説明を用意できるか", "対応できる言語や予約の方法を、英語で載せられるか", "訪日外国人向けの対策が、契約の範囲に入っているか"]
+};
+function quickHtml(top, theme) {
+  const k = top || "meo", quick = QUICK[k];
+  if (state.answers.setup === "vendor") return `
+    <div class="quick">
+      <p class="eyebrow">今の業者さんに確認するとよいこと</p>
+      <h3>「${AXES[k].short}」について、次の3点を聞いてみてください</h3>
+      <div class="picked">${VENDOR_CHECK[k].map(t => `<span>・${t}</span>`).join("")}</div>
+    </div>`;
+  const busy = state.answers.setup === "busy";
+  return `
+    <div class="quick">
+      <p class="eyebrow">${busy ? "5分でできること" : "今日から院内でできること"}</p>
+      <h3>${quick.title}</h3>
+      <p style="font-size:13.5px">${quick.body}${busy ? "まずはこの1つだけで十分です。" : ""}</p>
+      <p class="ex-cap">${quick.cap}</p>
+      <p class="ex">${quick.ex(theme)}</p>
+    </div>`;
+}
 const Q9 = [
   ["rival", "近隣の上位の医院が、具体的にどんな対策をしているか"],
   ["hp", "AIに貴院を紹介してもらうために、ホームページのどこを直せばよいか"],
@@ -427,7 +451,7 @@ function renderQuestion() {
   </section>
   ${i === 0 ? memo("7問はタップのみ、最後の1問だけひとこと入力。予算や決裁者のような営業っぽい質問は入れない。") : ""}
   ${q.type === "text" ? memo("入力式にしたので、診療科が変わっても質問を作り直さずに使える。入力例だけ、リストの診療科で出し分ける。入力内容はAIへの質問文と取り組みの見出しに入り、「美容」「インプラント」などの言葉はタイプ判定にも使う。") : ""}
-  ${q.id === "route" || q.id === "reason" || q.id === "web" ? memo("この質問は、電話で深掘りする材料として先に聞いておくもの。タイプ判定や施策の書き分けにも使う。") : ""}`;
+  ${q.id === "route" || q.id === "reason" || q.id === "setup" ? memo("この質問は、電話で深掘りする材料として先に聞いておくもの。タイプ判定や施策の書き分けにも使う。") : ""}`;
   app.querySelectorAll(".opt").forEach(b => b.onclick = () => {
     state.answers[q.id] = b.dataset.v;
     b.setAttribute("aria-pressed", "true");
@@ -474,7 +498,6 @@ function renderResult() {
   const gap = k => ev[k].grade ? GAP[ev[k].grade] : -1;  // 判定できなかった項目は最後に回す
   const ranked = Object.keys(AXES).sort((a, b) => (imp[b] * gap(b)) - (imp[a] * gap(a)) || imp[b] - imp[a]);
   const top = ev[ranked[0]].grade ? ranked[0] : null;  // どれも判定できなかったときは最優先を出さない
-  const quick = QUICK[top || "meo"];
 
   const summaryHtml = ["meo", "aio", "in"].map(k => {
     const a = { ...AXES[k], ...ev[k] };
@@ -536,13 +559,7 @@ function renderResult() {
   <section class="sheet">
     <h2 class="section-title">貴院におすすめの取り組み</h2>
     <ol class="plans">${ranked.map(k => { const [h, p] = AXES[k].plan(theme); return `<li><h3>${h}</h3><p>${p}</p></li>`; }).join("")}</ol>
-    <div class="quick">
-      <p class="eyebrow">今日から院内でできること</p>
-      <h3>${quick.title}</h3>
-      <p style="font-size:13.5px">${quick.body}</p>
-      <p class="ex-cap">${quick.cap}</p>
-      <p class="ex">${quick.ex(theme)}</p>
-    </div>
+    ${quickHtml(top, theme)}
   </section>
   ${memo("結果は出し惜しみしない。方向性と、院内ですぐできることを1つ具体的に渡してから、最後の質問に進む。")}
 
